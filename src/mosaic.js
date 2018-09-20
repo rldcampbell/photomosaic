@@ -10,40 +10,35 @@ const inputFilePath = "./test_data/7516757216_IMG_1030.JPG"
 const size = 100
 const shape = [50, 50]
 const outputFilePath = "./_LATEST_TEST.jpg"
+const reuseLimit = 10
 
-// render time is far too long? e.g. 5s to creat thumbnails, 40s to assign, 2mins to render
-// for shape [50, 50] = 2500 tiles, size 100
-// known issue with 'sharp' that was due to upstream blocker - no longer.
-// could directly work on change to sharp...
-// could try separately rendering rows and then stitching together...? interesting start point
-// rss should not be out of control, and stitching photos together should take no time!
-// either solve or rethink method of stitching together...
-// also make more modular - so it's easy to change comparison method, pool reuse, ...
-// not - calling global.gc() manually makes things a lot faster and less memory intensive...
-// may need to release memory better
+// make more modular - so it's easy to change comparison method, pool reuse, ...
 
 console.time("total time")
 console.time("thumbnail time")
 
-// console.log(process.memoryUsage())
-
 let thumbs = thumbnails
   .create({
-    globPattern: "./test_data/IMG*.*",
+    globPattern: "./test_data/*.*",
     size: size,
     newDirectory: "./_thumbnails/",
     newExtension: "jpg"
   })
   .then(ts => {
     console.timeEnd("thumbnail time")
+    let succeeded = ts.filter(t => t.status === "success")
+    if (reuseLimit > 0 && succeeded.length * reuseLimit < shape[0] * shape[1]) {
+      throw new Error("Not enough thumbnails to create photomosaic")
+    }
     return Promise.all(
-      ts.filter(t => t.status === "success").map(t => {
+      succeeded.map(t => {
         return sharp(t.path)
           .raw()
           .toBuffer()
           .then(data => ({
             path: t.path,
-            rgba: buffer.meanRGB(data)
+            rgba: buffer.meanRGB(data),
+            uses: 0
           }))
       })
     )
@@ -62,6 +57,9 @@ const best = function(pool, distFunc) {
       index = i
     }
   }
+
+  pool[index].uses += 1
+
   return index
 }
 
@@ -84,7 +82,14 @@ Promise.all([thumbs, picture])
         //   return dist(a.rgba) - dist(b.rgba)
         // })
         // pic.set(i, j, tms[0].path)
-        pic.set(i, j, tms[best(tms, dist)].path)
+        let index = best(tms, dist)
+
+        pic.set(i, j, tms[index].path)
+
+        if (tms[index].uses === reuseLimit) {
+          // remove...
+          tms.splice(index, 1)
+        }
       }
     }
     return pic
