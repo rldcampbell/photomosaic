@@ -9,10 +9,12 @@ const stitch = require("./stitch.js")
 const inputFilePath = "./test_data/7516757216_IMG_1030.JPG"
 const size = 100
 const shape = [50, 50]
-const outputFilePath = "./_MEGA_TEST_9.jpg"
+const outputFilePath = "./_LATEST_TEST.jpg"
 
 // render time is far too long? e.g. 5s to creat thumbnails, 40s to assign, 2mins to render
 // for shape [50, 50] = 2500 tiles, size 100
+// known issue with 'sharp' that was due to upstream blocker - no longer.
+// could directly work on change to sharp...
 // could try separately rendering rows and then stitching together...? interesting start point
 // rss should not be out of control, and stitching photos together should take no time!
 // either solve or rethink method of stitching together...
@@ -27,7 +29,7 @@ console.time("thumbnail time")
 
 let thumbs = thumbnails
   .create({
-    globPattern: "./test_data/*.*",
+    globPattern: "./test_data/IMG*.*",
     size: size,
     newDirectory: "./_thumbnails/",
     newExtension: "jpg"
@@ -49,6 +51,20 @@ let thumbs = thumbnails
 
 let picture = tiles.fromPath(inputFilePath, shape)
 
+const best = function(pool, distFunc) {
+  let index = 0
+  let best = 255 * 3
+  let len = pool.length
+  for (let i = 0; i < len; i++) {
+    let d = distFunc(pool[i].rgba)
+    if (d < best) {
+      best = d
+      index = i
+    }
+  }
+  return index
+}
+
 Promise.all([thumbs, picture])
   .then(a => {
     console.time("assign time")
@@ -64,10 +80,11 @@ Promise.all([thumbs, picture])
             rgbVals[2] - rgb[2]
           ].reduce((p, c) => p + Math.abs(c), 0)
         }
-        tms.sort((a, b) => {
-          return dist(a.rgba) - dist(b.rgba)
-        })
-        pic.set(i, j, tms[0].path)
+        // tms.sort((a, b) => {
+        //   return dist(a.rgba) - dist(b.rgba)
+        // })
+        // pic.set(i, j, tms[0].path)
+        pic.set(i, j, tms[best(tms, dist)].path)
       }
     }
     return pic
