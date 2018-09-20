@@ -5,8 +5,10 @@ const stitch = function(pathndarray, size, shape) {
   // assumes all images have same dimensions!
   // may change input format, this is just proof of concept...
   // concept is very good!
+  // iterate through tiles, iterate through pixel values, assign
+  // to massive buffer representing final image
   const channels = 3
-  const mBuffer = Buffer.alloc(size * size * shape[0] * shape[1] * channels)
+  const mBuffer = Buffer.alloc(size * size * shape[0] * shape[1] * 3)
 
   return Promise.all(
     reduce2(
