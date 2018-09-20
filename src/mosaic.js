@@ -2,7 +2,6 @@ const thumbnails = require("./thumbnails.js")
 const buffer = require("./buffer.js")
 const sharp = require("sharp")
 const tiles = require("./tiles.js")
-const { reduce2 } = require("./ndarray.js")
 const stitch = require("./stitch.js")
 
 // temp
@@ -68,30 +67,24 @@ Promise.all([thumbs, picture])
     console.time("assign time")
     let tms = a[0]
     let pic = a[1]
-    for (let i = 0; i < pic.shape[0]; i++) {
-      for (let j = 0; j < pic.shape[1]; j++) {
-        let rgbVals = getRGB(pic.get(i, j)).slice(0, 3)
-        let dist = function(rgb) {
-          return [
-            rgbVals[0] - rgb[0],
-            rgbVals[1] - rgb[1],
-            rgbVals[2] - rgb[2]
-          ].reduce((p, c) => p + Math.abs(c), 0)
-        }
-        // tms.sort((a, b) => {
-        //   return dist(a.rgba) - dist(b.rgba)
-        // })
-        // pic.set(i, j, tms[0].path)
-        let index = best(tms, dist)
 
-        pic.set(i, j, tms[index].path)
-
-        if (tms[index].uses === reuseLimit) {
-          // remove...
-          tms.splice(index, 1)
-        }
+    pic.forEach(p => {
+      let dist = function(rgb) {
+        return [p.rgb[0] - rgb[0], p.rgb[1] - rgb[1], p.rgb[2] - rgb[2]].reduce(
+          (p, c) => p + Math.abs(c),
+          0
+        )
       }
-    }
+      let index = best(tms, dist)
+
+      p.path = tms[index].path
+
+      if (tms[index].uses === reuseLimit) {
+        // remove...
+        tms.splice(index, 1)
+      }
+    })
+
     return pic
   })
   .then(pic => {
@@ -105,15 +98,3 @@ Promise.all([thumbs, picture])
     console.log(`"${outputFilePath}" created`)
     console.timeEnd("total time")
   })
-
-function getRGB(input) {
-  const n = input.size / input.shape[2]
-  return reduce2(
-    input,
-    (tally, value, i, j, k) => {
-      tally[k] += value / n
-      return tally
-    },
-    new Array(input.shape[2]).fill(0)
-  )
-}
