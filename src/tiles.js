@@ -27,13 +27,15 @@ const fromPath = function(filePath, shape) {
             .raw()
             .toBuffer({ resolveWithObject: true })
             .then(({ data, info }) => {
+              let rgb = buffer[info.channels === 3 ? "meanRGB" : "meanRGBA"](
+                data
+              ).slice(0, 3)
               return {
-                i: i,
-                j: j,
-                data: data,
-                rgb: buffer[info.channels === 3 ? "meanRGB" : "meanRGBA"](
-                  data
-                ).slice(0, 3),
+                i,
+                j,
+                data,
+                rgb,
+                brightness: rgb.reduce((p, c) => p + c / 3, 0),
                 channels: info.channels
               }
             })

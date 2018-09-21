@@ -2,6 +2,7 @@ const fs = require("fs")
 const glob = require("glob")
 const path = require("path")
 const sharp = require("sharp")
+const buffer = require("./buffer.js")
 
 const globPromise = function(pattern, options = {}) {
   return new Promise(function(resolve, reject) {
@@ -34,11 +35,27 @@ const processFilePathSharp = function(
     .rotate()
     .resize(size, size)
     .toFile(newFilePath)
-    .then(_ => {
-      return {
-        path: newFilePath,
-        status: "success"
-      }
+    .then(info => {
+      return sharp(newFilePath, {
+        raw: {
+          height: info.height,
+          width: info.width,
+          channels: info.channels
+        }
+      })
+        .resize(10, 10)
+        .raw()
+        .toBuffer()
+        .then(data => {
+          return {
+            path: newFilePath,
+            status: "success",
+            data,
+            rgb: buffer.meanRGB(data),
+            channels: info.channels,
+            uses: 0
+          }
+        })
     })
     .catch(err => {
       return {
