@@ -7,7 +7,7 @@ const tiles = require("./tiles.js")
 const inputFilePath = "./test_data/7516757216_IMG_1055.JPG"
 const size = 100
 const shape = [25, 25]
-const outputFilePath = "./_LATEST_TEST.jpg"
+const outputFilePath = "./rgb.jpg"
 const reuseLimit = 10
 
 // make more modular - so it's easy to change comparison method, pool reuse, ...
@@ -102,6 +102,7 @@ Promise.all([thumbs, picture])
       let index = best(tms, dist)
 
       p.path = tms[index].path
+      p.rgbThumb = tms[index].rgb
 
       if (tms[index].uses === reuseLimit) {
         // remove...
