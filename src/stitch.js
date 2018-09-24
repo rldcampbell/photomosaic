@@ -1,11 +1,9 @@
 const sharp = require("sharp")
 
-const stitch = function(tiles, size, shape) {
+const stitch = function(tiles, size, shape, colour = "none") {
+  // colour = "none" | "rgb" | "tint"
   const channels = 3
   const mBuffer = Buffer.alloc(size * size * shape[0] * shape[1] * 3)
-
-  // temp
-  const colour = "rgb" // "none" | "tint" | "rgb"
 
   return Promise.all(
     tiles.map(tile => {

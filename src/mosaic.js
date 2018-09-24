@@ -4,32 +4,40 @@ const thumbnails = require("./thumbnails.js")
 const tiles = require("./tiles.js")
 
 // temp
-const inputFilePath = "./test_data/7516757216_IMG_1055.JPG"
+const inputFilePath = "./test_data/IMG_2499.JPG"
 const size = 100
 const shape = [25, 25]
-const outputFilePath = "./rgb.jpg"
-const reuseLimit = 10
+const outputFilePath = "./_LATEST_TEST.jpg"
+const reuseLimit = 5
+const globPattern = "./test_data/*.*"
+const newDirectory = "./thumbnails/"
+const newExtension = "jpg"
+const create = false
+const colour = "rgb" // "none" | "rgb" | "tint"
+const method = "pixel" // "pixel" | "rgb"
 
 // make more modular - so it's easy to change comparison method, pool reuse, ...
 
 console.time("total time")
 console.time("thumbnail time")
 
-let thumbs = thumbnails
-  .create({
-    globPattern: "./test_data/*.*",
-    size: size,
-    newDirectory: "./_thumbnails/",
-    newExtension: "jpg"
-  })
-  .then(ts => {
-    console.timeEnd("thumbnail time")
-    let succeeded = ts.filter(t => t.status === "success")
-    if (reuseLimit > 0 && succeeded.length * reuseLimit < shape[0] * shape[1]) {
-      throw new Error("Not enough thumbnails to create photomosaic")
-    }
-    return Promise.all(succeeded)
-  })
+let thumbs = create
+  ? thumbnails.create({
+      globPattern,
+      size,
+      newDirectory,
+      newExtension
+    })
+  : thumbnails.get()
+
+thumbs = thumbs.then(ts => {
+  console.timeEnd("thumbnail time")
+  let succeeded = ts.filter(t => t.status === "success")
+  if (reuseLimit > 0 && succeeded.length * reuseLimit < shape[0] * shape[1]) {
+    throw new Error("Not enough thumbnails to create photomosaic")
+  }
+  return Promise.all(succeeded)
+})
 
 let picture = tiles.fromPath(inputFilePath, shape)
 
@@ -84,28 +92,28 @@ Promise.all([thumbs, picture])
     pic.sort(sort.light)
 
     pic.forEach(p => {
-      // let dist = function(thumb) {
-      //   return (
-      //     [
-      //       p.rgb[0] - thumb.rgb[0],
-      //       p.rgb[1] - thumb.rgb[1],
-      //       p.rgb[2] - thumb.rgb[2]
-      //     ].reduce((p, c) => p + Math.abs(c), 0) /
-      //     (3 * 255)
-      //   ) // normalize to 1
-      // }
+      let distRGB = function(thumb) {
+        return (
+          [
+            p.rgb[0] - thumb.rgb[0],
+            p.rgb[1] - thumb.rgb[1],
+            p.rgb[2] - thumb.rgb[2]
+          ].reduce((p, c) => p + Math.abs(c), 0) /
+          (3 * 255)
+        ) // normalize to 1
+      }
 
       let dist = function(thumb) {
         return norm2(thumb.data, p.data)
       }
 
-      let index = best(tms, dist)
+      let index = best(tms, method === "rgb" ? distRGB : dist)
 
       p.path = tms[index].path
       p.rgbThumb = tms[index].rgb
 
       if (tms[index].uses === reuseLimit) {
-        // remove...
+        // remove once reached reuse limit
         tms.splice(index, 1)
       }
     })
@@ -115,7 +123,7 @@ Promise.all([thumbs, picture])
   .then(pic => {
     console.timeEnd("assign time")
     console.time("render time")
-    return stitch(pic, size, shape)
+    return stitch(pic, size, shape, colour)
   })
   .then(img => img.toFile(outputFilePath))
   .then(_ => {

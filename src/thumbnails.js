@@ -20,12 +20,45 @@ const ensureDirectoryExists = function(filePath) {
   fs.mkdirSync(dirName)
 }
 
-const processFilePathSharp = function(
-  filePath,
-  size,
-  newDirectory,
-  newExtension
-) {
+const process = function(filePath, size) {
+  const image = sharp(filePath)
+
+  return image
+    .metadata()
+    .then(metadata => {
+      if (metadata.width !== size || metadata.height !== size)
+        // thumbnail is incorrect size
+        throw new Error(
+          `Thumbnail size is ${metadata.width}x${
+            metadata.height
+          }. Expected ${size}x${size}.`
+        )
+
+      return image
+        .resize(10, 10)
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+        .then(({ data, info }) => {
+          return {
+            path: filePath,
+            status: "success",
+            data,
+            rgb: buffer.meanRGB(data),
+            channels: info.channels,
+            uses: 0
+          }
+        })
+    })
+    .catch(err => {
+      return {
+        path: filePath,
+        status: "failed",
+        err
+      }
+    })
+}
+
+const processNew = function(filePath, size, newDirectory, newExtension) {
   let { name } = path.parse(filePath)
   let newFilePath = path.join(newDirectory, `${name}.${newExtension}`)
 
@@ -35,27 +68,8 @@ const processFilePathSharp = function(
     .rotate()
     .resize(size, size)
     .toFile(newFilePath)
-    .then(info => {
-      return sharp(newFilePath, {
-        raw: {
-          height: info.height,
-          width: info.width,
-          channels: info.channels
-        }
-      })
-        .resize(10, 10)
-        .raw()
-        .toBuffer()
-        .then(data => {
-          return {
-            path: newFilePath,
-            status: "success",
-            data,
-            rgb: buffer.meanRGB(data),
-            channels: info.channels,
-            uses: 0
-          }
-        })
+    .then(_ => {
+      return process(newFilePath, size)
     })
     .catch(err => {
       return {
@@ -80,7 +94,7 @@ const create = function(options) {
   return globPromise(options.globPattern).then(function(filePaths) {
     return Promise.all(
       filePaths.map(filePath =>
-        processFilePathSharp(
+        processNew(
           filePath,
           options.size,
           options.newDirectory,
@@ -91,4 +105,21 @@ const create = function(options) {
   })
 }
 
+const get = function(options) {
+  options = Object.assign(
+    {
+      globPattern: "./_thumbnails/*.jpg",
+      size: 100
+    },
+    options
+  )
+
+  return globPromise(options.globPattern).then(function(filePaths) {
+    return Promise.all(
+      filePaths.map(filePath => process(filePath, options.size))
+    )
+  })
+}
+
 exports.create = create
+exports.get = get
