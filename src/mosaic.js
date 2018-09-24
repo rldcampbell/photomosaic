@@ -8,9 +8,10 @@ const inputFilePath = "./test_data/IMG_2499.JPG"
 const size = 100
 const shape = [25, 25]
 const outputFilePath = "./_LATEST_TEST.jpg"
-const reuseLimit = 5
+const reuseLimit = 4
 const globPattern = "./test_data/*.*"
-const newDirectory = "./thumbnails/"
+const globPattern2 = "./_thumbnails/*.*"
+const newDirectory = "./_thumbnails/"
 const newExtension = "jpg"
 const create = false
 const colour = "rgb" // "none" | "rgb" | "tint"
@@ -28,13 +29,29 @@ let thumbs = create
       newDirectory,
       newExtension
     })
-  : thumbnails.get()
+  : thumbnails.get({
+      size,
+      globPattern: globPattern2
+    })
 
 thumbs = thumbs.then(ts => {
   console.timeEnd("thumbnail time")
+  const len = ts.length
   let succeeded = ts.filter(t => t.status === "success")
-  if (reuseLimit > 0 && succeeded.length * reuseLimit < shape[0] * shape[1]) {
-    throw new Error("Not enough thumbnails to create photomosaic")
+  const lenSucceeded = succeeded.length
+  const lenFailed = len - lenSucceeded
+  if (lenFailed)
+    console.warn(
+      `Warning: ${lenFailed} out of ${len} matched path${
+        lenFailed === 1 ? "" : "s"
+      } failed during loading`
+    )
+  if (reuseLimit > 0 && lenSucceeded * reuseLimit < shape[0] * shape[1]) {
+    throw new Error(
+      `Not enough thumbnails to create photomosaic. ${Math.ceil(
+        (shape[0] * shape[1]) / reuseLimit
+      )} required, ${lenSucceeded} loaded`
+    )
   }
   return Promise.all(succeeded)
 })
@@ -131,3 +148,4 @@ Promise.all([thumbs, picture])
     console.log(`"${outputFilePath}" created`)
     console.timeEnd("total time")
   })
+  .catch(console.error)
