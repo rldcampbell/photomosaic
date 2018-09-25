@@ -1,13 +1,3 @@
-const distance = function(buffA, buffB) {
-  const len = buffA.length
-  if (len !== buffB.length) throw new Error("Buffers must be of equal length")
-  let result = 0
-  for (let i = 0; i < len; i++) {
-    result += Math.abs(buffA.readUInt8(i) - buffB.readUInt8(i))
-  }
-  return result
-}
-
 const meanRGBA = function(buff) {
   const len = buff.length
   const n = len / 4
@@ -42,6 +32,5 @@ const reduce = function(buff, func, init) {
   return init
 }
 
-exports.distance = distance
 exports.meanRGB = meanRGB
 exports.meanRGBA = meanRGBA
