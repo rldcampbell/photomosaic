@@ -1,37 +1,72 @@
 const sort = require("./sort.js")
 const stitch = require("./stitch.js")
 const thumbnails = require("./thumbnails.js")
-const tiles = require("./tiles.js")
+const imageTiles = require("./tiles.js")
+const path = require("path")
+const fs = require("fs")
+const stripJSONComments = require("strip-json-comments")
 
-// temp
-const inputFilePath = "./test_data/IMG_2499.JPG"
-const size = 100
-const shape = [25, 25]
-const outputFilePath = "./_LATEST_TEST.jpg"
-const reuseLimit = 4
-const globPattern = "./test_data/*.*"
-const globPattern2 = "./_thumbnails/*.*"
-const newDirectory = "./_thumbnails/"
-const newExtension = "jpg"
-const create = false
-const colour = "rgb" // "none" | "rgb" | "tint"
-const method = "pixel" // "pixel" | "rgb"
+const extend = function(a, ...args) {
+  return args.reduce(merge, a || {})
+}
+
+const merge = function(a, b) {
+  if (typeof b === "object") {
+    for (let key in b) {
+      a[key] = b[key]
+    }
+  }
+  return a
+}
+
+let options
+
+try {
+  let configPath = path.resolve(process.argv[2] || "config.json")
+  let configJSON = fs.readFileSync(configPath, "utf-8")
+  configJSON = stripJSONComments(configJSON)
+  options = JSON.parse(configJSON)
+} catch (err) {
+  options = {}
+  console.warn("Warning: No configuration file found. Using default settings.")
+}
+
+const { image, shape, colour, tiles, assign, output } = extend(
+  {
+    image: "original.jpg",
+    shape: [20, 20],
+    colour: "none",
+    tiles: {
+      size: 100,
+      get: "./_thumbnails/*.*"
+    },
+    assign: {
+      method: "pixel",
+      priority: "middle",
+      reuse: 0
+    },
+    output: "photomosaic.jpg"
+  },
+  options
+)
+
+const size = tiles.size
 
 // make more modular - so it's easy to change comparison method, pool reuse, ...
 
 console.time("total time")
 console.time("thumbnail time")
 
-let thumbs = create
+let thumbs = tiles.create
   ? thumbnails.create({
-      globPattern,
+      globPattern: tiles.source,
       size,
-      newDirectory,
-      newExtension
+      newDirectory: tiles.target.directory,
+      newExtension: tiles.target.extension
     })
   : thumbnails.get({
       size,
-      globPattern: globPattern2
+      globPattern: tiles.get
     })
 
 thumbs = thumbs.then(ts => {
@@ -46,17 +81,19 @@ thumbs = thumbs.then(ts => {
         lenFailed === 1 ? "" : "s"
       } failed during loading`
     )
-  if (reuseLimit > 0 && lenSucceeded * reuseLimit < shape[0] * shape[1]) {
+  if (lenSucceeded === 0)
+    throw new Error("No thumbnails loaded. Cannot create photomosaic.")
+  if (assign.reuse > 0 && lenSucceeded * assign.reuse < shape[0] * shape[1]) {
     throw new Error(
       `Not enough thumbnails to create photomosaic. ${Math.ceil(
-        (shape[0] * shape[1]) / reuseLimit
+        (shape[0] * shape[1]) / assign.reuse
       )} required, ${lenSucceeded} loaded`
     )
   }
   return Promise.all(succeeded)
 })
 
-let picture = tiles.fromPath(inputFilePath, shape)
+let picture = imageTiles.fromPath(image, shape)
 
 const reduce2 = function(arr1, arr2, func, init) {
   const len = Math.min(arr1.length, arr2.length)
@@ -106,7 +143,7 @@ Promise.all([thumbs, picture])
     let tms = a[0]
     let pic = a[1]
 
-    pic.sort(sort.light)
+    pic.sort(sort[assign.priority])
 
     pic.forEach(p => {
       let distRGB = function(thumb) {
@@ -124,12 +161,12 @@ Promise.all([thumbs, picture])
         return norm2(thumb.data, p.data)
       }
 
-      let index = best(tms, method === "rgb" ? distRGB : dist)
+      let index = best(tms, assign.method === "rgb" ? distRGB : dist)
 
       p.path = tms[index].path
       p.rgbThumb = tms[index].rgb
 
-      if (tms[index].uses === reuseLimit) {
+      if (tms[index].uses === assign.reuse) {
         // remove once reached reuse limit
         tms.splice(index, 1)
       }
@@ -142,10 +179,10 @@ Promise.all([thumbs, picture])
     console.time("render time")
     return stitch(pic, size, shape, colour)
   })
-  .then(img => img.toFile(outputFilePath))
+  .then(img => img.toFile(output))
   .then(_ => {
     console.timeEnd("render time")
-    console.log(`"${outputFilePath}" created`)
+    console.log(`"${output}" created`)
     console.timeEnd("total time")
   })
   .catch(console.error)
