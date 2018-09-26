@@ -1,3 +1,4 @@
+const _ = require("lodash")
 const sort = require("./sort.js")
 const stitch = require("./stitch.js")
 const thumbnails = require("./thumbnails.js")
@@ -5,19 +6,6 @@ const imageTiles = require("./tiles.js")
 const path = require("path")
 const fs = require("fs")
 const stripJSONComments = require("strip-json-comments")
-
-const extend = function(a, ...args) {
-  return args.reduce(merge, a || {})
-}
-
-const merge = function(a, b) {
-  if (typeof b === "object") {
-    for (let key in b) {
-      a[key] = b[key]
-    }
-  }
-  return a
-}
 
 let options
 
@@ -31,7 +19,7 @@ try {
   console.warn("Warning: No configuration file found. Using default settings.")
 }
 
-const { image, shape, colour, tiles, assign, output } = extend(
+const { image, shape, colour, tiles, assign, output } = _.merge(
   {
     image: "original.jpg",
     shape: [20, 20],
@@ -59,10 +47,11 @@ console.time("thumbnail time")
 
 let thumbs = tiles.create
   ? thumbnails.create({
-      globPattern: tiles.source,
+      globPattern: tiles.create.source,
       size,
-      newDirectory: tiles.target.directory,
-      newExtension: tiles.target.extension
+      newDirectory: tiles.create.target.directory,
+      newExtension: tiles.create.target.extension,
+      newPrefix: tiles.create.target.prefix
     })
   : thumbnails.get({
       size,

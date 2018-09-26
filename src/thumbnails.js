@@ -58,8 +58,22 @@ const process = function(filePath, size) {
     })
 }
 
-const processNew = function(filePath, size, newDirectory, newExtension) {
-  let { name } = path.parse(filePath)
+const processNew = function(
+  filePath,
+  size,
+  newDirectory,
+  newExtension,
+  newPrefix,
+  suffix
+) {
+  let name
+  if (newPrefix) {
+    name = `${newPrefix}${suffix}`
+  } else {
+    name = path.parse(filePath).name
+  }
+
+  if (newExtension.charAt(0) === ".") newExtension = newExtension.substr(1)
   let newFilePath = path.join(newDirectory, `${name}.${newExtension}`)
 
   ensureDirectoryExists(newFilePath)
@@ -93,12 +107,14 @@ const create = function(options) {
 
   return globPromise(options.globPattern).then(function(filePaths) {
     return Promise.all(
-      filePaths.map(filePath =>
+      filePaths.map((filePath, i) =>
         processNew(
           filePath,
           options.size,
           options.newDirectory,
-          options.newExtension
+          options.newExtension,
+          options.newPrefix,
+          i + 1
         )
       )
     )
